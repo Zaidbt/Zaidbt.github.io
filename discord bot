@@ -1,0 +1,97 @@
+import discord
+from discord.ext import commands
+import yt_dlp as youtube_dl  # Updated YouTube downloader
+import asyncio
+
+intents = discord.Intents.default()
+intents.message_content = True
+
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+@bot.event
+async def on_ready():
+    print('Logged in as {bot.user}')
+    print(' Bot is ready!')
+
+@bot.command()
+async def join(ctx):
+    """Bot joins the voice channel."""
+    if ctx.author.voice:
+        channel = ctx.author.voice.channel
+        if ctx.voice_client is None:
+            await channel.connect()
+        else:
+            await ctx.send(" I'm already in a voice channel!")
+    else:
+        await ctx.send(" You must be in a voice channel to use this command.")
+
+@bot.command()
+async def leave(ctx):
+    """Bot leaves the voice channel."""
+    if ctx.voice_client:
+        await ctx.voice_client.disconnect()
+        await ctx.send(" Left the voice channel.")
+    else:
+        await ctx.send(" I'm not in a voice channel.")
+
+@bot.command()
+async def play(ctx, url: str):
+    """Plays audio from a YouTube URL."""
+    if not ctx.voice_client:
+        await ctx.invoke(join)
+
+    ydl_opts = {
+        'format': 'bestaudio',
+        'noplaylist': True,  # Prevents playing entire playlists
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
+        }]
+    }
+
+    try:
+        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            audio_url = info.get('url')
+
+        if not audio_url:
+            await ctx.send(" Could not extract audio from the provided link.")
+            return
+
+        ctx.voice_client.stop()
+        ctx.voice_client.play(discord.FFmpegPCMAudio(audio_url))
+        await ctx.send(f' Now playing: **{info["title"]}**')
+
+    except Exception as e:
+        await ctx.send(f" Error: {str(e)}")
+
+@bot.command()
+async def pause(ctx):
+    """Pauses the current song."""
+    if ctx.voice_client and ctx.voice_client.is_playing():
+        ctx.voice_client.pause()
+        await ctx.send("⏸ Paused.")
+    else:
+        await ctx.send(" No audio is playing.")
+
+@bot.command()
+async def resume(ctx):
+    """Resumes a paused song."""
+    if ctx.voice_client and ctx.voice_client.is_paused():
+        ctx.voice_client.resume()
+        await ctx.send("️ Resumed.")
+    else:
+        await ctx.send(" No audio is paused.")
+
+@bot.command()
+async def stop(ctx):
+    """Stops the song."""
+    if ctx.voice_client and ctx.voice_client.is_playing():
+        ctx.voice_client.stop()
+        await ctx.send("⏹ Stopped.")
+    else:
+        await ctx.send(" I'm not playing anything.")
+
+if __name__ == "__main__":
+    bot.run('MTM0NDAzNTk0MTE5NDQwMzk1MQ.GKzWSw.RJrrYIupaVsc-iL7F71QZQvHuLwWUC2NziF6NI')
